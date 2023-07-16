@@ -1,13 +1,11 @@
 import { defineConfig } from 'astro/config'
 import unocss from 'unocss/astro'
 import solidJs from '@astrojs/solid-js'
-import AstroPWA from '@vite-pwa/astro'
 
 import node from '@astrojs/node'
+import AstroPWA from '@vite-pwa/astro'
 import vercel from '@astrojs/vercel/edge'
 import netlify from '@astrojs/netlify/edge-functions'
-import wasm from 'vite-plugin-wasm'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import disableBlocks from './plugins/disableBlocks'
 
 const envAdapter = () => {
@@ -20,10 +18,6 @@ const envAdapter = () => {
 
 // https://astro.build/config
 export default defineConfig({
-  load: {
-    // Configure the loader for ".wasm" files
-    '.wasm': 'file',
-  },
   integrations: [
     unocss(),
     solidJs(),
@@ -31,18 +25,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'inline',
       manifest: {
-        name: 'Free Chat',
-        short_name: 'Free Chat',
-        description: 'Chat for free with AI chatbot',
+        name: 'ChatGPT-API Demo',
+        short_name: 'ChatGPT Demo',
+        description: 'A demo repo based on OpenAI API',
         theme_color: '#212129',
-        background_color: '#212129',
+        background_color: '#ffffff',
         icons: [
-          {
-            src: 'apple-touch-icon.png',
-            sizes: '180x180',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
           {
             src: 'pwa-192.png',
             sizes: '192x192',
@@ -57,7 +45,7 @@ export default defineConfig({
             src: 'icon.svg',
             sizes: '32x32',
             type: 'image/svg',
-            purpose: 'any',
+            purpose: 'any maskable',
           },
         ],
       },
@@ -73,6 +61,9 @@ export default defineConfig({
   output: 'server',
   adapter: envAdapter(),
   vite: {
-    plugins: [wasm(), topLevelAwait(), ((process.env.OUTPUT === 'vercel' || process.env.OUTPUT === 'netlify') && disableBlocks())],
+    plugins: [
+      process.env.OUTPUT === 'vercel' && disableBlocks(),
+      process.env.OUTPUT === 'netlify' && disableBlocks(),
+    ],
   },
 })
