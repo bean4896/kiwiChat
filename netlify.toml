@@ -1,6 +1,8 @@
 [build.environment]
   NETLIFY_USE_PNPM = "true"
   NODE_VERSION = "18"
+      NETLIFY_EXCLUDE_RENDERING = "true"
+    NETLIFY_EXCLUDE_EXTERNAL_REQUESTS = "true"
 
 [build]
   command = "OUTPUT=netlify astro build"
@@ -10,3 +12,4 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Content-Type = "application/manifest+json"
+
