@@ -2,7 +2,7 @@ import { defineConfig } from 'astro/config'
 import unocss from 'unocss/astro'
 import solidJs from '@astrojs/solid-js'
 import AstroPWA from '@vite-pwa/astro'
-
+import { VitePWA } from 'vite-plugin-pwa'
 import node from '@astrojs/node'
 import vercel from '@astrojs/vercel/edge'
 import netlify from '@astrojs/netlify/edge-functions'
@@ -71,4 +71,13 @@ export default defineConfig({
   vite: {
     plugins: [wasm(), topLevelAwait(), ((process.env.OUTPUT === 'vercel' || process.env.OUTPUT === 'netlify') && disableBlocks())],
   },
+  plugins: [
+    VitePWA({
+      // Other VitePWA configuration options
+      manifest: {
+        // Other manifest configuration options
+        ssr: false, // Disable SSR imports
+      },
+    }),
+  ],
 })
