@@ -20,6 +20,10 @@ const envAdapter = () => {
 
 // https://astro.build/config
 export default defineConfig({
+  load: {
+    // Configure the loader for ".wasm" files
+    '.wasm': 'file',
+  },
   integrations: [
     unocss(),
     solidJs(),
