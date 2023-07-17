@@ -21,7 +21,7 @@ const origin = Astro.request.headers.get('host')
     <meta name="theme-color" content="#212129">
     <meta name="generator" content={Astro.generator}>
     <title>{title} - {origin}</title>
-    <meta name="description" content="Chat for free with AI chatbot" />
+    <meta name="description" content="Kiwi Chat with AI chatbot" />
     { import.meta.env.HEAD_SCRIPTS && <Fragment set:html={import.meta.env.HEAD_SCRIPTS } /> }
     { pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} /> }
     { import.meta.env.PROD && pwaInfo && <Fragment set:html={pwaInfo.registerSW.scriptTag} /> }
@@ -29,7 +29,6 @@ const origin = Astro.request.headers.get('host')
   <body>
     <slot />
   </body>
-  <script defer src="https://visit-count.muspimerol.site/"></script>
 </html>
 
 <style is:global>
