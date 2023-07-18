@@ -27,9 +27,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'inline',
       manifest: {
-        name: 'Free Chat',
-        short_name: 'Free Chat',
-        description: 'Chat for free with AI chatbot',
+        name: 'Kiwi Chat',
+        short_name: 'Kiwi Chat',
+        description: 'Chat for Kiwi with AI chatbot',
         theme_color: '#212129',
         background_color: '#212129',
         icons: [
