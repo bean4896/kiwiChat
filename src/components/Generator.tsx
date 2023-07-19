@@ -242,7 +242,7 @@ export default () => {
   }
 
   return (
-    <div class="flex flex-col flex-grow h-full justify-between relative">
+    <div class="flex flex-col flex-grow h-full justify-between relative mb-10">
       <div
         ref={bgd!}
         class="bg-top-center bg-hero-kiwi-50/10 h-1000vh w-full translate-y-$scroll transition-opacity top-0 left-0 z--1 duration-1000 fixed op-100 <md:bg-none <md:hiddern"
