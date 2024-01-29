@@ -20,7 +20,7 @@ const origin = Astro.request.headers.get('host')
     <link rel="mask-icon" href="/icon.svg" color="#FFFFFF">
     <meta name="theme-color" content="#212129">
     <meta name="generator" content={Astro.generator}>
-    <title>{title} - {origin}</title>
+    <title>{title} - AI Chat Bot</title>
     <meta name="description" content="Kiwi Chat with AI chatbot" />
     { import.meta.env.HEAD_SCRIPTS && <Fragment set:html={import.meta.env.HEAD_SCRIPTS } /> }
     { pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} /> }
