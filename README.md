@@ -9,7 +9,8 @@
 ## Features
 
 - 💬 **ChatGPT Interface** - Clean, modern UI for AI conversations
-- 🔧 **MCP Integration** - AI can interact with your local file system
+- 🔧 **MCP Integration** - AI can interact with your file system and search the web
+- 🔍 **Web Search** - AI can search the internet for real-time information
 - 🎨 **Dark/Light Theme** - Toggle between themes
 - 📱 **PWA Support** - Install as an app
 - 🔒 **Optional Password Protection** - Secure your instance
@@ -44,18 +45,24 @@ Open http://localhost:3000
 
 ## MCP (Model Context Protocol)
 
-This project includes **MCP integration**, allowing the AI to interact with your local file system.
+This project includes **MCP integration**, allowing the AI to interact with your local file system and search the web.
 
-### What Can It Do?
+### Available MCP Tools
 
-The AI can:
-- 📁 **Read files** - Access and read any file in the project
-- ✍️ **Write files** - Create or modify files
-- 📂 **List directories** - Browse folder contents
-- 🗂️ **Create directories** - Make new folders
+#### 📁 File System (Local Development)
+- **Read files** - Access and read any file in the project
+- **Write files** - Create or modify files
+- **List directories** - Browse folder contents
+- **Create directories** - Make new folders
+
+#### 🔍 Web Search (Local & Vercel)
+- **Search the web** - Find current information using DuckDuckGo
+- **Fetch webpages** - Extract content from any URL
+- **Summarize URLs** - Get webpage summaries
 
 ### Example Prompts
 
+**File System (Local only):**
 ```
 "List all files in this directory"
 "Read the package.json file and tell me the project name"
@@ -63,25 +70,57 @@ The AI can:
 "Analyze all TypeScript files in src/ and create a summary"
 ```
 
+**Web Search (Works everywhere):**
+```
+"What's the latest news about AI?"
+"Search for Node.js best practices"
+"Summarize this article: https://example.com/article"
+"What's the weather in Tokyo today?"
+```
+
 ### Configuration
 
-MCP is configured via environment variables:
+MCP is configured via environment variables in your `.env` file:
 
+#### Option 1: File System Only (Local Development)
 ```bash
-# Enable MCP
 ENABLE_MCP=true
-
-# Configure file system access
-# {{PROJECT_ROOT}} is automatically replaced with the project directory
 MCP_SERVERS={"filesystem":{"command":"node","args":["mcp-filesystem-server.mjs"],"env":{"MCP_FS_BASE_PATH":"{{PROJECT_ROOT}}"}}}
+```
+
+#### Option 2: Web Search Only (Works on Vercel ✅)
+```bash
+ENABLE_MCP=true
+MCP_SERVERS={"websearch":{"command":"node","args":["mcp-websearch-server.mjs"]}}
+```
+
+#### Option 3: Both File System and Web Search (Recommended for Local)
+```bash
+ENABLE_MCP=true
+MCP_SERVERS={"filesystem":{"command":"node","args":["mcp-filesystem-server.mjs"],"env":{"MCP_FS_BASE_PATH":"{{PROJECT_ROOT}}"}},"websearch":{"command":"node","args":["mcp-websearch-server.mjs"]}}
+```
+
+**Note:** `{{PROJECT_ROOT}}` is automatically replaced with your project directory.
+
+### MCP on Vercel Deployment
+
+**Important:** File system tools only work for local development. When deploying to Vercel:
+
+- ❌ **File System** - Won't access user's local files (Vercel runs on cloud servers)
+- ✅ **Web Search** - Works perfectly on Vercel for real-time information
+
+**Recommended Vercel Configuration:**
+```bash
+ENABLE_MCP=true
+MCP_SERVERS={"websearch":{"command":"node","args":["mcp-websearch-server.mjs"]}}
 ```
 
 ### Security
 
-- ✅ **Path Validation** - Can only access files within configured directory
-- ✅ **No Path Traversal** - Prevents `../` attacks
-- ✅ **Explicit Tools** - Each operation must be explicitly defined
-- ✅ **Easy to Disable** - Set `ENABLE_MCP=false` to turn off
+- ✅ **File System:** Path validation and no path traversal (local only)
+- ✅ **Web Search:** Makes HTTP requests to public websites (works on Vercel)
+- ✅ **Explicit Tools:** Each operation must be explicitly defined
+- ✅ **Easy to Disable:** Set `ENABLE_MCP=false` to turn off all MCP features
 
 ### Expanding Access
 

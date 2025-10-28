@@ -70,7 +70,6 @@ export const POST: APIRoute = async({ request }) => {
         console.log('[MCP] Manager not connected, no tools available')
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('[MCP] Error getting tools:', error)
     }
   }
@@ -149,7 +148,6 @@ export const POST: APIRoute = async({ request }) => {
           // eslint-disable-next-line no-console
           console.log('[MCP] Result preview:', resultText.slice(0, 200))
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error('[MCP] Execution error:', error)
           toolResults.push({
             role: 'tool',
@@ -210,7 +208,6 @@ export const POST: APIRoute = async({ request }) => {
 
   // Normal streaming mode without tools
   const response = await fetch(`${baseUrl}/v1/chat/completions`, initOptions).catch((err: Error) => {
-    // eslint-disable-next-line no-console
     console.error(err)
     return new Response(JSON.stringify({
       error: {
