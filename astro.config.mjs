@@ -12,7 +12,14 @@ import disableBlocks from './plugins/disableBlocks'
 
 const envAdapter = () => {
   switch (process.env.OUTPUT) {
-    case 'vercel': return vercel()
+    case 'vercel': return vercel({
+      imageService: true,
+      imagesConfig: {
+        sizes: [320, 640, 1280],
+        domains: [],
+      },
+      functionPerRoute: false,
+    })
     case 'netlify': return netlify()
     default: return node({ mode: 'standalone' })
   }

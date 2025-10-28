@@ -1,4 +1,12 @@
 {
   "buildCommand": "OUTPUT=vercel astro build",
-  "framework": null
+  "framework": null,
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs20.x"
+    },
+    "*.ts": {
+      "runtime": "nodejs20.x"
+    }
+  }
 }
