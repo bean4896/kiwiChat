@@ -19,6 +19,7 @@ const envAdapter = () => {
         domains: [],
       },
       functionPerRoute: false,
+      runtime: 'nodejs20.x',
     })
     case 'netlify': return netlify()
     default: return node({ mode: 'standalone' })
