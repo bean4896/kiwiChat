@@ -12,9 +12,7 @@ import disableBlocks from './plugins/disableBlocks'
 
 const envAdapter = () => {
   switch (process.env.OUTPUT) {
-    case 'vercel': return vercel({
-      runtime: 'nodejs20.x',
-    })
+    case 'vercel': return vercel()
     case 'netlify': return netlify()
     default: return node({ mode: 'standalone' })
   }
