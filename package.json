@@ -1,7 +1,6 @@
 {
   "name": "kiwichat",
   "version": "0.0.5",
-  "packageManager": "pnpm@7.28.0",
   "engines": {
     "node": ">=22.x"
   },
