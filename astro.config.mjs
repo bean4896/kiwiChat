@@ -4,7 +4,7 @@ import solidJs from '@astrojs/solid-js'
 import AstroPWA from '@vite-pwa/astro'
 
 import node from '@astrojs/node'
-import vercel from '@astrojs/vercel/edge'
+import vercel from '@astrojs/vercel/serverless'
 import netlify from '@astrojs/netlify/edge-functions'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
