@@ -28,6 +28,40 @@ export default defineConfig({
       injectRegister: 'inline',
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // Exclude problematic files from precaching
+        globIgnores: ['**/node_modules/**', '**/_astro/**/*.wasm'],
+        navigateFallback: null, // Disable navigate fallback to avoid non-precached-url error
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gstatic-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
       },
       manifest: {
         name: 'Kiwi Chat',
@@ -65,7 +99,7 @@ export default defineConfig({
         periodicSyncForUpdates: 20,
       },
       devOptions: {
-        enabled: true,
+        enabled: false, // Disable in development to avoid issues
       },
     }),
   ],

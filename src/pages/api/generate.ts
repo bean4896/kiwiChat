@@ -17,6 +17,16 @@ const ua = import.meta.env.UNDICI_UA
 const enableMCP = import.meta.env.ENABLE_MCP === 'true'
 const isVercel = !!import.meta.env.VERCEL || process.env.VERCEL === '1'
 
+// Debug logging for Vercel
+if (isVercel) {
+  // eslint-disable-next-line no-console
+  console.log('[Vercel] Detected Vercel environment')
+  // eslint-disable-next-line no-console
+  console.log('[Vercel] ENABLE_MCP:', enableMCP)
+  // eslint-disable-next-line no-console
+  console.log('[Vercel] Has OpenAI Key:', !!import.meta.env.OPENAI_API_KEY)
+}
+
 const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']
 
 // Initialize MCP on first request (only for local development)
@@ -217,16 +227,24 @@ export const POST: APIRoute = async({ request }) => {
 
           // Use direct functions on Vercel, MCP on local
           if (isVercel) {
+            // eslint-disable-next-line no-console
+            console.log('[Vercel] Using direct function for:', toolCall.function.name)
             // Direct function calls for Vercel
             if (toolCall.function.name === 'search_web') {
               const results = await searchWeb(args.query, args.max_results || 10)
               resultText = `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
+              // eslint-disable-next-line no-console
+              console.log('[Vercel] Search completed, results:', results.length)
             } else if (toolCall.function.name === 'fetch_webpage') {
               const content = await fetchWebpage(args.url, args.max_length || 5000)
               resultText = `Content from ${args.url}:\n\n${content}`
+              // eslint-disable-next-line no-console
+              console.log('[Vercel] Fetch completed, length:', content.length)
             } else if (toolCall.function.name === 'summarize_url') {
               const content = await fetchWebpage(args.url, 3000)
               resultText = `Content from ${args.url} (for summarization):\n\n${content}`
+              // eslint-disable-next-line no-console
+              console.log('[Vercel] Summarize completed, length:', content.length)
             } else {
               throw new Error(`Unknown tool: ${toolCall.function.name}`)
             }
