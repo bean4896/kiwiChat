@@ -2,7 +2,7 @@
   "name": "kiwichat",
   "version": "0.0.5",
   "engines": {
-    "node": ">=22.x"
+    "node": ">=20.x"
   },
   "scripts": {
     "dev": "astro dev",
