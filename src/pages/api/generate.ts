@@ -5,6 +5,7 @@ import { generatePayload, parseOpenAIStream } from '@/utils/openAI'
 import { verifySignature } from '@/utils/auth'
 import { getMCPManager } from '@/utils/mcpClient'
 import { initializeMCP } from '@/utils/mcpInit'
+import { fetchWebpage, formatSearchResults, searchWeb } from '@/utils/webSearchDirect'
 import type { APIRoute } from 'astro'
 import type { ChatMessage } from '@/types'
 
@@ -14,13 +15,20 @@ const baseUrl = ((import.meta.env.OPENAI_API_BASE_URL) || 'https://api.openai.co
 const sitePassword = import.meta.env.SITE_PASSWORD
 const ua = import.meta.env.UNDICI_UA
 const enableMCP = import.meta.env.ENABLE_MCP === 'true'
+const isVercel = !!import.meta.env.VERCEL || process.env.VERCEL === '1'
 
 const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']
 
-// Initialize MCP on first request
+// Initialize MCP on first request (only for local development)
 let mcpInitPromise: Promise<void> | null = null
-if (enableMCP && !mcpInitPromise)
+if (enableMCP && !mcpInitPromise && !isVercel) {
   mcpInitPromise = initializeMCP()
+  // eslint-disable-next-line no-console
+  console.log('[MCP] Using MCP SDK (local mode)')
+} else if (enableMCP && isVercel) {
+  // eslint-disable-next-line no-console
+  console.log('[WebSearch] Using direct functions (Vercel mode)')
+}
 
 export const POST: APIRoute = async({ request }) => {
   const body = await request.json()
@@ -63,23 +71,85 @@ export const POST: APIRoute = async({ request }) => {
     ]
   }
 
-  // Get MCP tools if enabled
+  // Get tools if enabled
   let tools
   if (enableMCP) {
-    try {
-      const mcpManager = getMCPManager()
-      if (mcpManager.isConnected()) {
-        tools = mcpManager.getAllTools()
-        // eslint-disable-next-line no-console
-        console.log(`[MCP] Using ${tools.length} tools for this request`)
-        // eslint-disable-next-line no-console
-        console.log('[MCP] Tools:', tools.map(t => t.name).join(', '))
-      } else {
-        // eslint-disable-next-line no-console
-        console.log('[MCP] Manager not connected, no tools available')
+    if (isVercel) {
+      // Define tools manually for Vercel (no MCP SDK)
+      tools = [
+        {
+          name: 'search_web',
+          description: 'Search the web using DuckDuckGo. Returns search results with titles, snippets, and URLs.',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The search query',
+              },
+              max_results: {
+                type: 'number',
+                description: 'Maximum number of results to return (default: 10)',
+                default: 10,
+              },
+            },
+            required: ['query'],
+          },
+        },
+        {
+          name: 'fetch_webpage',
+          description: 'Fetch and extract the main content from a webpage. Returns the text content of the page.',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              url: {
+                type: 'string',
+                description: 'The URL to fetch',
+              },
+              max_length: {
+                type: 'number',
+                description: 'Maximum content length in characters (default: 5000)',
+                default: 5000,
+              },
+            },
+            required: ['url'],
+          },
+        },
+        {
+          name: 'summarize_url',
+          description: 'Fetch a URL and return a summary. Combines fetching and content extraction.',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              url: {
+                type: 'string',
+                description: 'The URL to summarize',
+              },
+            },
+            required: ['url'],
+          },
+        },
+      ] as any
+      // eslint-disable-next-line no-console
+      console.log(`[WebSearch] Using ${tools.length} direct tools for this request`)
+      // eslint-disable-next-line no-console
+      console.log('[WebSearch] Tools:', tools.map((t: any) => t.name).join(', '))
+    } else {
+      try {
+        const mcpManager = getMCPManager()
+        if (mcpManager.isConnected()) {
+          tools = mcpManager.getAllTools()
+          // eslint-disable-next-line no-console
+          console.log(`[MCP] Using ${tools.length} tools for this request`)
+          // eslint-disable-next-line no-console
+          console.log('[MCP] Tools:', tools.map(t => t.name).join(', '))
+        } else {
+          // eslint-disable-next-line no-console
+          console.log('[MCP] Manager not connected, no tools available')
+        }
+      } catch (error) {
+        console.error('[MCP] Error getting tools:', error)
       }
-    } catch (error) {
-      console.error('[MCP] Error getting tools:', error)
     }
   }
 
@@ -135,17 +205,37 @@ export const POST: APIRoute = async({ request }) => {
       console.log('[MCP] Tool calls detected:', toolCalls.map((tc: any) => tc.function.name).join(', '))
 
       // Execute tools
-      const mcpManager = getMCPManager()
       const toolResults: ChatMessage[] = []
 
       for (const toolCall of toolCalls) {
         try {
           const args = JSON.parse(toolCall.function.arguments)
           // eslint-disable-next-line no-console
-          console.log(`[MCP] Executing ${toolCall.function.name}:`, args)
+          console.log(`[Tool] Executing ${toolCall.function.name}:`, args)
 
-          const result = await mcpManager.executeTool(toolCall.function.name, args)
-          const resultText = result.content?.[0]?.text || JSON.stringify(result)
+          let resultText: string
+
+          // Use direct functions on Vercel, MCP on local
+          if (isVercel) {
+            // Direct function calls for Vercel
+            if (toolCall.function.name === 'search_web') {
+              const results = await searchWeb(args.query, args.max_results || 10)
+              resultText = `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
+            } else if (toolCall.function.name === 'fetch_webpage') {
+              const content = await fetchWebpage(args.url, args.max_length || 5000)
+              resultText = `Content from ${args.url}:\n\n${content}`
+            } else if (toolCall.function.name === 'summarize_url') {
+              const content = await fetchWebpage(args.url, 3000)
+              resultText = `Content from ${args.url} (for summarization):\n\n${content}`
+            } else {
+              throw new Error(`Unknown tool: ${toolCall.function.name}`)
+            }
+          } else {
+            // MCP for local development
+            const mcpManager = getMCPManager()
+            const result = await mcpManager.executeTool(toolCall.function.name, args)
+            resultText = result.content?.[0]?.text || JSON.stringify(result)
+          }
 
           toolResults.push({
             role: 'tool',
@@ -155,9 +245,9 @@ export const POST: APIRoute = async({ request }) => {
           })
 
           // eslint-disable-next-line no-console
-          console.log('[MCP] Result preview:', resultText.slice(0, 200))
+          console.log('[Tool] Result preview:', resultText.slice(0, 200))
         } catch (error) {
-          console.error('[MCP] Execution error:', error)
+          console.error('[Tool] Execution error:', error)
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
