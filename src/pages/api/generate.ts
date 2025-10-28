@@ -51,8 +51,17 @@ export const POST: APIRoute = async({ request }) => {
   if (enableMCP && mcpInitPromise)
     await mcpInitPromise
 
-  // Use messages as-is (system role is handled by frontend)
-  const requestMessageList = messages
+  // Add system message for MCP tools if enabled and no system message exists
+  let requestMessageList = messages
+  if (enableMCP && (!messages[0] || messages[0].role !== 'system')) {
+    requestMessageList = [
+      {
+        role: 'system',
+        content: 'You are a helpful AI assistant with web search tools.\n\n🚨 CRITICAL WORKFLOW:\n\n1. For CURRENT DATE/TIME queries:\n   - Use fetch_webpage("https://www.timeanddate.com/")\n   - Extract and state the actual date directly\n\n2. For MOVIES/NEWS/EVENTS queries - BE SMART:\n\n   STRATEGY A - Try search snippets FIRST (FASTER!):\n   - Use search_web("latest movies 2025")\n   - READ the snippets carefully\n   - If snippets contain enough movie names/info → Answer directly from snippets\n   - ✅ Example: Snippet says "Wicked, Gladiator 2, Moana 2" → Use that!\n\n   STRATEGY B - Only fetch if snippets are empty/vague:\n   - If snippets don\'t have actual names → Use fetch_webpage\n   - Pick first good URL → Scrape → Extract names\n\n3. ⚡ SPEED MATTERS:\n   - Try to answer from search snippets when possible\n   - Only use fetch_webpage as backup\n   - Users prefer quick answers over perfect answers\n\n4. ❌ FORBIDDEN:\n   - Listing page titles as content\n   - Saying "visit [website]"\n   - Returning vague descriptions\n\n5. ✅ ALWAYS:\n   - Give specific names/titles from snippets or scraped content\n   - Format: "最新电影：《电影A》《电影B》《电影C》"\n   - Be direct and concise\n\nRemember: Snippets first → fetch only if needed!',
+      },
+      ...messages,
+    ]
+  }
 
   // Get MCP tools if enabled
   let tools
@@ -188,7 +197,14 @@ export const POST: APIRoute = async({ request }) => {
       // #vercel-end
 
       response = await fetch(`${baseUrl}/v1/chat/completions`, finalOptions)
-      return parseOpenAIStream(response as unknown as Response)
+      // eslint-disable-next-line no-console
+      console.log('[MCP] Final response status:', response.status, 'ok:', response.ok)
+      // eslint-disable-next-line no-console
+      console.log('[MCP] Returning streaming response...')
+      const streamResponse = parseOpenAIStream(response as unknown as Response)
+      // eslint-disable-next-line no-console
+      console.log('[MCP] Stream response created')
+      return streamResponse
     }
 
     // No tool calls, convert to streaming response

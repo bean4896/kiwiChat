@@ -26,12 +26,12 @@ const server = new Server(
 )
 
 // Tool definitions
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+server.setRequestHandler(ListToolsRequestSchema, async() => {
   return {
     tools: [
       {
         name: 'search_web',
-        description: 'Search the web using DuckDuckGo. Returns search results with titles, snippets, and URLs. Use this to find current information, news, or answers to questions.',
+        description: 'Search the web using DuckDuckGo for current information. Use this when users ask about: current events, today\'s date, weather, news, latest information, or anything time-sensitive. Returns search results that you should read and synthesize into a direct answer.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -41,8 +41,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             max_results: {
               type: 'number',
-              description: 'Maximum number of results to return (default: 5)',
-              default: 5,
+              description: 'Maximum number of results to return (default: 10, max: 15)',
+              default: 10,
             },
           },
           required: ['query'],
@@ -50,7 +50,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fetch_webpage',
-        description: 'Fetch and extract the main content from a webpage. Returns the text content of the page. Use this to read articles, documentation, or any web page.',
+        description: 'Fetch and extract content from a specific webpage URL. Use this when you have a specific URL to read. After fetching, provide a synthesized answer, not just the raw content.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -131,7 +131,7 @@ async function fetchWebpage(url, maxLength = 5000) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 15000,
+      timeout: 8000, // Reduced from 15s to 8s for faster response
       maxContentLength: 1024 * 1024 * 5, // 5MB limit
     })
 
@@ -143,7 +143,7 @@ async function fetchWebpage(url, maxLength = 5000) {
     // Try to find main content
     let content = ''
     const selectors = ['main', 'article', '[role="main"]', '.content', '#content', '.post-content', '.article-content']
-    
+
     for (const selector of selectors) {
       const text = $(selector).first().text().trim()
       if (text.length > 200) {
@@ -153,16 +153,14 @@ async function fetchWebpage(url, maxLength = 5000) {
     }
 
     // Fallback to body if no main content found
-    if (!content) {
+    if (!content)
       content = $('body').text().trim()
-    }
 
     // Clean up whitespace
     content = content.replace(/\s+/g, ' ').slice(0, maxLength)
 
-    if (!content || content.length < 50) {
+    if (!content || content.length < 50)
       throw new Error('No substantial content found on page')
-    }
 
     return content
   } catch (error) {
@@ -171,7 +169,7 @@ async function fetchWebpage(url, maxLength = 5000) {
 }
 
 // Tool execution
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async(request) => {
   const { name, arguments: args } = request.params
 
   try {
@@ -236,7 +234,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         console.error(`[WebSearch] Fetching for summary: ${url}`)
         const content = await fetchWebpage(url, 3000)
 
-        console.error(`[WebSearch] Content ready for summarization`)
+        console.error('[WebSearch] Content ready for summarization')
         return {
           content: [
             {
@@ -275,4 +273,3 @@ main().catch((error) => {
   console.error('Fatal error:', error)
   process.exit(1)
 })
-

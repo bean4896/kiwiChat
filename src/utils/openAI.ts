@@ -59,8 +59,9 @@ export const parseOpenAIStream = (rawResponse: Response) => {
   const decoder = new TextDecoder()
 
   const headers = Object.fromEntries(rawResponse.headers)
-  delete headers['content-type']
   delete headers['content-encoding']
+  // Keep content-type for proper streaming
+  headers['content-type'] = 'text/event-stream'
 
   const initOptions = {
     status: rawResponse.status,
@@ -120,20 +121,6 @@ export const parseOpenAIStream = (rawResponse: Response) => {
             if (text) {
               const queue = encoder.encode(text)
               controller.enqueue(queue)
-            }
-
-            // Check if the stream is finishing
-            if (json.choices[0].finish_reason === 'tool_calls') {
-              if (currentToolCall)
-                toolCallsBuffer.push(currentToolCall)
-
-              // Send signal about tool calls
-              if (toolCallsBuffer.length > 0) {
-                const toolCallMarker = encoder.encode(
-                  `\n\n[TOOL_CALLS:${JSON.stringify(toolCallsBuffer)}]`,
-                )
-                controller.enqueue(toolCallMarker)
-              }
             }
           } catch (e) {
             console.error(e)

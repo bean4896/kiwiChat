@@ -268,11 +268,11 @@ export default () => {
             <p><span class="rounded-md font-mono bg-$c-fg-5 py-1 px-1.75 ring-1.2 ring-$c-fg-20">鼠标中键点击左上标题</span> &nbsp;新窗口打开新会话 </p>
             <p><span class="rounded-md font-mono bg-$c-fg-5 py-1 px-1.75 ring-1.2 ring-$c-fg-20">PageUp</span> / <span class="rounded-md font-mono bg-$c-fg-5 py-1 px-1.75 ring-1.2 ring-$c-fg-20">PageDn</span> &nbsp;回到顶部 / 底部 </p>
             <div class="border-t border-$c-fg-10 pt-3 mt-2">
-              <p class="font-bold text-emerald-600 dark:text-emerald-400 mb-2">🔧 MCP 功能已启用</p>
-              <p class="text-xs opacity-75">AI 可以访问本地文件系统：</p>
-              <p class="text-xs opacity-75">• 📁 读取文件 • ✍️ 创建/编辑文件</p>
-              <p class="text-xs opacity-75">• 📂 列出目录 • 🗂️ 创建文件夹</p>
-              <p class="text-xs opacity-75 mt-1">示例："列出当前目录的所有文件"</p>
+              <p class="font-bold text-emerald-600 dark:text-emerald-400 mb-2">🔍 网络搜索功能已启用</p>
+              <p class="text-xs opacity-75">AI 可以搜索网络获取实时信息：</p>
+              <p class="text-xs opacity-75">• 🌐 搜索网页 • 📰 获取最新资讯</p>
+              <p class="text-xs opacity-75">• 📄 抓取网页内容 • 🗓️ 查询当前日期</p>
+              <p class="text-xs opacity-75 mt-1">示例："今天星期几？" "搜索最新AI新闻"</p>
             </div>
           </div>
         )
