@@ -14,12 +14,11 @@ export interface BraveSearchResult {
 /**
  * Search using Brave Search API
  */
-export async function braveSearchWeb(query: string, count: number = 10): Promise<BraveSearchResult[]> {
-  const apiKey = import.meta.env.BRAVE_SEARCH_API_KEY || process.env.BRAVE_SEARCH_API_KEY
+export async function braveSearchWeb(query: string, count = 10): Promise<BraveSearchResult[]> {
+  const apiKey = import.meta?.env?.BRAVE_SEARCH_API_KEY ?? process.env?.BRAVE_SEARCH_API_KEY
 
-  if (!apiKey) {
+  if (!apiKey)
     throw new Error('BRAVE_SEARCH_API_KEY not configured')
-  }
 
   try {
     // eslint-disable-next-line no-console
@@ -48,11 +47,9 @@ export async function braveSearchWeb(query: string, count: number = 10): Promise
       url: r.url || '',
       description: r.description || '',
     }))
-  }
-  catch (error) {
+  } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('[Brave Search] Search failed:', errorMsg)
     throw new Error(`Brave Search failed: ${errorMsg}`)
   }
 }
-
