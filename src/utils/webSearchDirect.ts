@@ -17,6 +17,7 @@ export interface SearchResult {
  */
 export async function searchWeb(query: string, maxResults: number = 10): Promise<SearchResult[]> {
   try {
+    // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Searching for: "${query}"`)
     
     const response = await axios.get('https://html.duckduckgo.com/html/', {
@@ -24,8 +25,14 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 8000,
+      timeout: 10000, // Increased to 10s
+      validateStatus: () => true, // Accept any status code
     })
+
+    // Check response status
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
 
     const $ = cheerio.load(response.data)
     const results: SearchResult[] = []
@@ -48,11 +55,19 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
       return true
     })
 
+    // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Found ${results.length} results`)
     return results
   } catch (error) {
-    console.error('[WebSearch Direct] Search failed:', error)
-    throw new Error(`Search failed: ${error instanceof Error ? error.message : String(error)}`)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    console.error('[WebSearch Direct] Search failed:', errorMsg)
+    
+    // Return a more helpful error for timeouts
+    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+      throw new Error('Search request timed out. Please try again.')
+    }
+    
+    throw new Error(`Search failed: ${errorMsg}`)
   }
 }
 
@@ -61,15 +76,22 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
  */
 export async function fetchWebpage(url: string, maxLength: number = 5000): Promise<string> {
   try {
+    // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Fetching: ${url}`)
     
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 8000,
+      timeout: 10000, // Increased to 10s
       maxContentLength: 1024 * 1024 * 5, // 5MB limit
+      validateStatus: () => true, // Accept any status code
     })
+
+    // Check response status
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
 
     const $ = cheerio.load(response.data)
 
@@ -98,11 +120,19 @@ export async function fetchWebpage(url: string, maxLength: number = 5000): Promi
     if (!content || content.length < 50)
       throw new Error('No substantial content found on page')
 
+    // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Fetched ${content.length} characters`)
     return content
   } catch (error) {
-    console.error('[WebSearch Direct] Fetch failed:', error)
-    throw new Error(`Failed to fetch webpage: ${error instanceof Error ? error.message : String(error)}`)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    console.error('[WebSearch Direct] Fetch failed:', errorMsg)
+    
+    // Return a more helpful error for timeouts
+    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+      throw new Error('Fetch request timed out. The website may be slow or unavailable.')
+    }
+    
+    throw new Error(`Failed to fetch webpage: ${errorMsg}`)
   }
 }
 

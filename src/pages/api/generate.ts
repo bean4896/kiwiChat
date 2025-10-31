@@ -33,6 +33,16 @@ if (isVercel) {
 
 const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']
 
+// Timeout wrapper for tool execution
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs),
+    ),
+  ])
+}
+
 // Initialize MCP on first request (only for local development)
 let mcpInitPromise: Promise<void> | null = null
 if (enableMCP && !mcpInitPromise && !isVercel) {
@@ -222,6 +232,7 @@ export const POST: APIRoute = async({ request }) => {
       const toolResults: ChatMessage[] = []
 
       for (const toolCall of toolCalls) {
+        const startTime = Date.now()
         try {
           const args = JSON.parse(toolCall.function.arguments)
           // eslint-disable-next-line no-console
@@ -233,32 +244,45 @@ export const POST: APIRoute = async({ request }) => {
           if (isVercel) {
             // eslint-disable-next-line no-console
             console.log('[Vercel] Using direct function for:', toolCall.function.name)
-            // Direct function calls for Vercel
-            if (toolCall.function.name === 'search_web') {
-              const results = await searchWeb(args.query, args.max_results || 10)
-              resultText = `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
-              // eslint-disable-next-line no-console
-              console.log('[Vercel] Search completed, results:', results.length)
-            } else if (toolCall.function.name === 'fetch_webpage') {
-              const content = await fetchWebpage(args.url, args.max_length || 5000)
-              resultText = `Content from ${args.url}:\n\n${content}`
-              // eslint-disable-next-line no-console
-              console.log('[Vercel] Fetch completed, length:', content.length)
-            } else if (toolCall.function.name === 'summarize_url') {
-              const content = await fetchWebpage(args.url, 3000)
-              resultText = `Content from ${args.url} (for summarization):\n\n${content}`
-              // eslint-disable-next-line no-console
-              console.log('[Vercel] Summarize completed, length:', content.length)
-            } else {
-              throw new Error(`Unknown tool: ${toolCall.function.name}`)
-            }
+            
+            // Wrap each tool call with a timeout (15s max on Vercel)
+            const toolPromise = (async() => {
+              if (toolCall.function.name === 'search_web') {
+                const results = await searchWeb(args.query, args.max_results || 10)
+                // eslint-disable-next-line no-console
+                console.log('[Vercel] Search completed, results:', results.length)
+                return `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
+              } else if (toolCall.function.name === 'fetch_webpage') {
+                const content = await fetchWebpage(args.url, args.max_length || 5000)
+                // eslint-disable-next-line no-console
+                console.log('[Vercel] Fetch completed, length:', content.length)
+                return `Content from ${args.url}:\n\n${content}`
+              } else if (toolCall.function.name === 'summarize_url') {
+                const content = await fetchWebpage(args.url, 3000)
+                // eslint-disable-next-line no-console
+                console.log('[Vercel] Summarize completed, length:', content.length)
+                return `Content from ${args.url} (for summarization):\n\n${content}`
+              } else {
+                throw new Error(`Unknown tool: ${toolCall.function.name}`)
+              }
+            })()
+            
+            resultText = await withTimeout(toolPromise, 12000, toolCall.function.name)
           } else {
             // MCP for local development
             const mcpManager = getMCPManager()
-            const result = await mcpManager.executeTool(toolCall.function.name, args)
+            const result = await withTimeout(
+              mcpManager.executeTool(toolCall.function.name, args),
+              15000,
+              toolCall.function.name,
+            )
             resultText = result.content?.[0]?.text || JSON.stringify(result)
           }
 
+          const duration = Date.now() - startTime
+          // eslint-disable-next-line no-console
+          console.log(`[Tool] ${toolCall.function.name} completed in ${duration}ms`)
+          
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -269,12 +293,15 @@ export const POST: APIRoute = async({ request }) => {
           // eslint-disable-next-line no-console
           console.log('[Tool] Result preview:', resultText.slice(0, 200))
         } catch (error) {
-          console.error('[Tool] Execution error:', error)
+          const duration = Date.now() - startTime
+          const errorMsg = error instanceof Error ? error.message : String(error)
+          console.error(`[Tool] ${toolCall.function.name} failed after ${duration}ms:`, errorMsg)
+          
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
             name: toolCall.function.name,
-            content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            content: `Error: ${errorMsg}`,
           })
         }
       }
