@@ -16,7 +16,7 @@ export interface SearchResult {
 /**
  * Search web (uses Brave API if available, falls back to DuckDuckGo)
  */
-export async function searchWeb(query: string, maxResults: number = 10): Promise<SearchResult[]> {
+export async function searchWeb(query: string, maxResults = 10): Promise<SearchResult[]> {
   // Try Brave Search API first if key is available
   const braveKey = import.meta.env.BRAVE_SEARCH_API_KEY || process.env.BRAVE_SEARCH_API_KEY
 
@@ -30,8 +30,7 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
         snippet: r.description,
         url: r.url,
       }))
-    }
-    catch (error) {
+    } catch (error) {
       console.error('[WebSearch] Brave Search failed, falling back to DuckDuckGo:', error)
       // Fall through to DuckDuckGo
     }
@@ -52,9 +51,8 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
     })
 
     // Check response status
-    if (response.status !== 200) {
+    if (response.status !== 200)
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
 
     const $ = cheerio.load(response.data)
     const results: SearchResult[] = []
@@ -81,15 +79,13 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
     // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Found ${results.length} results`)
     return results
-  }
-  catch (error) {
+  } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('[WebSearch Direct] Search failed:', errorMsg)
 
     // Return a more helpful error for timeouts
-    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT'))
       throw new Error('Search request timed out. Please try again.')
-    }
 
     throw new Error(`Search failed: ${errorMsg}`)
   }
@@ -98,11 +94,11 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
 /**
  * Fetch and extract content from a webpage
  */
-export async function fetchWebpage(url: string, maxLength: number = 5000): Promise<string> {
+export async function fetchWebpage(url: string, maxLength = 5000): Promise<string> {
   try {
     // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Fetching: ${url}`)
-    
+
     const response = await axios.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -113,9 +109,8 @@ export async function fetchWebpage(url: string, maxLength: number = 5000): Promi
     })
 
     // Check response status
-    if (response.status !== 200) {
+    if (response.status !== 200)
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
 
     const $ = cheerio.load(response.data)
 
@@ -150,12 +145,11 @@ export async function fetchWebpage(url: string, maxLength: number = 5000): Promi
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('[WebSearch Direct] Fetch failed:', errorMsg)
-    
+
     // Return a more helpful error for timeouts
-    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+    if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT'))
       throw new Error('Fetch request timed out. The website may be slow or unavailable.')
-    }
-    
+
     throw new Error(`Failed to fetch webpage: ${errorMsg}`)
   }
 }
@@ -171,4 +165,3 @@ export function formatSearchResults(results: SearchResult[]): string {
     .map((r, i) => `${i + 1}. **${r.title}**\n   ${r.snippet}\n   URL: ${r.url}`)
     .join('\n\n')
 }
-

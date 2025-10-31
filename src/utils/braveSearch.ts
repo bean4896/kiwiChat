@@ -15,8 +15,7 @@ export interface BraveSearchResult {
  * Search using Brave Search API
  */
 export async function braveSearchWeb(query: string, count = 10): Promise<BraveSearchResult[]> {
-  const apiKey = import.meta?.env?.BRAVE_SEARCH_API_KEY ?? process.env?.BRAVE_SEARCH_API_KEY
-
+  const apiKey = import.meta.env.BRAVE_SEARCH_API_KEY || process.env.BRAVE_SEARCH_API_KEY
   if (!apiKey)
     throw new Error('BRAVE_SEARCH_API_KEY not configured')
 
