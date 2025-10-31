@@ -5,6 +5,7 @@
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import { braveSearchWeb } from './braveSearch'
 
 export interface SearchResult {
   title: string
@@ -13,13 +14,34 @@ export interface SearchResult {
 }
 
 /**
- * Search DuckDuckGo and return results
+ * Search web (uses Brave API if available, falls back to DuckDuckGo)
  */
 export async function searchWeb(query: string, maxResults: number = 10): Promise<SearchResult[]> {
+  // Try Brave Search API first if key is available
+  const braveKey = import.meta.env.BRAVE_SEARCH_API_KEY || process.env.BRAVE_SEARCH_API_KEY
+
+  if (braveKey) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[WebSearch] Using Brave Search API')
+      const results = await braveSearchWeb(query, maxResults)
+      return results.map(r => ({
+        title: r.title,
+        snippet: r.description,
+        url: r.url,
+      }))
+    }
+    catch (error) {
+      console.error('[WebSearch] Brave Search failed, falling back to DuckDuckGo:', error)
+      // Fall through to DuckDuckGo
+    }
+  }
+
+  // Fallback to DuckDuckGo (works locally, blocked on Vercel)
   try {
     // eslint-disable-next-line no-console
-    console.log(`[WebSearch Direct] Searching for: "${query}"`)
-    
+    console.log(`[WebSearch Direct] Using DuckDuckGo for: "${query}"`)
+
     const response = await axios.get('https://html.duckduckgo.com/html/', {
       params: { q: query },
       headers: {
@@ -38,7 +60,8 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
     const results: SearchResult[] = []
 
     $('.result__body').each((i, elem) => {
-      if (i >= maxResults) return false
+      if (i >= maxResults)
+        return false
 
       const $elem = $(elem)
       const title = $elem.find('.result__title').text().trim()
@@ -58,15 +81,16 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
     // eslint-disable-next-line no-console
     console.log(`[WebSearch Direct] Found ${results.length} results`)
     return results
-  } catch (error) {
+  }
+  catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('[WebSearch Direct] Search failed:', errorMsg)
-    
+
     // Return a more helpful error for timeouts
     if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
       throw new Error('Search request timed out. Please try again.')
     }
-    
+
     throw new Error(`Search failed: ${errorMsg}`)
   }
 }
