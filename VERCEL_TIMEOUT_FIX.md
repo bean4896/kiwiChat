@@ -16,10 +16,10 @@
 - **Cause**: No timeout wrapper around tool execution
 - **Fix**: Added `withTimeout()` wrapper with 12s limit per tool
 
-### 3. Insufficient Error Handling
-- **Issue**: Timeout errors weren't caught or logged properly
-- **Cause**: Generic error handling without timeout-specific messages
-- **Fix**: Added detailed error messages and execution duration logging
+### 3. Timeouts Exceeding Vercel Limits
+- **Issue**: 504 Gateway Timeout errors on Vercel
+- **Cause**: Tool timeout (12s) + Axios timeout (10s) exceeded Vercel's 10s function limit
+- **Fix**: Reduced tool timeout to 7s and axios timeout to 5s
 
 ## Changes Made
 
@@ -130,11 +130,16 @@ If timeout occurs:
 ## Timeout Hierarchy
 
 ```
-Vercel Function Timeout (10-60s depending on plan)
-  └─> Tool Execution Timeout (12s)
-      └─> Axios Request Timeout (10s)
+Vercel Function Timeout (10s on Hobby plan)
+  └─> Tool Execution Timeout (7s on Vercel, 10s local)
+      └─> Axios Request Timeout (5s)
           └─> Network Request
 ```
+
+**CRITICAL**: Vercel Hobby plan has a **10-second hard limit**.
+- Tool timeout must be < 10s
+- Axios timeout must be < tool timeout
+- Current settings: 7s tool / 5s axios = fits within 10s!
 
 ## Troubleshooting
 
