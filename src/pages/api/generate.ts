@@ -267,13 +267,13 @@ export const POST: APIRoute = async({ request }) => {
               }
             })()
             
-            resultText = await withTimeout(toolPromise, 12000, toolCall.function.name)
+            resultText = await withTimeout(toolPromise, 7000, toolCall.function.name)
           } else {
             // MCP for local development
             const mcpManager = getMCPManager()
             const result = await withTimeout(
               mcpManager.executeTool(toolCall.function.name, args),
-              15000,
+              10000,
               toolCall.function.name,
             )
             resultText = result.content?.[0]?.text || JSON.stringify(result)

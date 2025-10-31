@@ -25,7 +25,7 @@ export async function searchWeb(query: string, maxResults: number = 10): Promise
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 10000, // Increased to 10s
+      timeout: 5000, // Reduced to 5s for Vercel 10s limit
       validateStatus: () => true, // Accept any status code
     })
 
@@ -83,7 +83,7 @@ export async function fetchWebpage(url: string, maxLength: number = 5000): Promi
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 10000, // Increased to 10s
+      timeout: 5000, // Reduced to 5s for Vercel 10s limit
       maxContentLength: 1024 * 1024 * 5, // 5MB limit
       validateStatus: () => true, // Accept any status code
     })
