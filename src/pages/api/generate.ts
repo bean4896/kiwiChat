@@ -37,7 +37,7 @@ const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) =>
+    new Promise<T>((_resolve, reject) =>
       setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs),
     ),
   ])
@@ -244,7 +244,7 @@ export const POST: APIRoute = async({ request }) => {
           if (isVercel) {
             // eslint-disable-next-line no-console
             console.log('[Vercel] Using direct function for:', toolCall.function.name)
-            
+
             // Wrap each tool call with a timeout (15s max on Vercel)
             const toolPromise = (async() => {
               if (toolCall.function.name === 'search_web') {
@@ -266,7 +266,7 @@ export const POST: APIRoute = async({ request }) => {
                 throw new Error(`Unknown tool: ${toolCall.function.name}`)
               }
             })()
-            
+
             resultText = await withTimeout(toolPromise, 7000, toolCall.function.name)
           } else {
             // MCP for local development
@@ -282,7 +282,7 @@ export const POST: APIRoute = async({ request }) => {
           const duration = Date.now() - startTime
           // eslint-disable-next-line no-console
           console.log(`[Tool] ${toolCall.function.name} completed in ${duration}ms`)
-          
+
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -296,7 +296,7 @@ export const POST: APIRoute = async({ request }) => {
           const duration = Date.now() - startTime
           const errorMsg = error instanceof Error ? error.message : String(error)
           console.error(`[Tool] ${toolCall.function.name} failed after ${duration}ms:`, errorMsg)
-          
+
           toolResults.push({
             role: 'tool',
             tool_call_id: toolCall.id,

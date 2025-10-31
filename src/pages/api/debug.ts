@@ -9,7 +9,7 @@ export const GET: APIRoute = async() => {
   const enableMCP = import.meta.env.ENABLE_MCP === 'true' || process.env.ENABLE_MCP === 'true'
   const isVercel = !!import.meta.env.VERCEL || process.env.VERCEL === '1'
   const hasOpenAIKey = !!(import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)
-  
+
   const debug = {
     environment: {
       isVercel,
@@ -30,7 +30,7 @@ export const GET: APIRoute = async() => {
       expectedTools: enableMCP ? ['search_web', 'fetch_webpage', 'summarize_url'] : [],
     },
     dependencies: {
-      hasAxios: true,  // If this loads, axios is available
+      hasAxios: true, // If this loads, axios is available
       hasCheerio: true, // If this loads, cheerio is available
     },
     timestamp: new Date().toISOString(),
@@ -43,4 +43,3 @@ export const GET: APIRoute = async() => {
     },
   })
 }
-
