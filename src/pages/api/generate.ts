@@ -9,12 +9,12 @@ import { fetchWebpage, formatSearchResults, searchWeb } from '@/utils/webSearchD
 import type { APIRoute } from 'astro'
 import type { ChatMessage } from '@/types'
 
-const apiKey = import.meta.env.OPENAI_API_KEY
-const httpsProxy = import.meta.env.HTTPS_PROXY
-const baseUrl = ((import.meta.env.OPENAI_API_BASE_URL) || 'https://api.openai.com').trim().replace(/\/$/, '')
-const sitePassword = import.meta.env.SITE_PASSWORD
-const ua = import.meta.env.UNDICI_UA
-const enableMCP = import.meta.env.ENABLE_MCP === 'true'
+const apiKey = import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
+const httpsProxy = import.meta.env.HTTPS_PROXY || process.env.HTTPS_PROXY
+const baseUrl = ((import.meta.env.OPENAI_API_BASE_URL || process.env.OPENAI_API_BASE_URL) || 'https://api.openai.com').trim().replace(/\/$/, '')
+const sitePassword = import.meta.env.SITE_PASSWORD || process.env.SITE_PASSWORD
+const ua = import.meta.env.UNDICI_UA || process.env.UNDICI_UA
+const enableMCP = import.meta.env.ENABLE_MCP === 'true' || process.env.ENABLE_MCP === 'true'
 const isVercel = !!import.meta.env.VERCEL || process.env.VERCEL === '1'
 
 // Debug logging for Vercel
@@ -22,9 +22,13 @@ if (isVercel) {
   // eslint-disable-next-line no-console
   console.log('[Vercel] Detected Vercel environment')
   // eslint-disable-next-line no-console
-  console.log('[Vercel] ENABLE_MCP:', enableMCP)
+  console.log('[Vercel] ENABLE_MCP (import.meta.env):', import.meta.env.ENABLE_MCP)
   // eslint-disable-next-line no-console
-  console.log('[Vercel] Has OpenAI Key:', !!import.meta.env.OPENAI_API_KEY)
+  console.log('[Vercel] ENABLE_MCP (process.env):', process.env.ENABLE_MCP)
+  // eslint-disable-next-line no-console
+  console.log('[Vercel] ENABLE_MCP (final):', enableMCP)
+  // eslint-disable-next-line no-console
+  console.log('[Vercel] Has OpenAI Key:', !!(import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY))
 }
 
 const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']

@@ -5,9 +5,10 @@
 import type { APIRoute } from 'astro'
 
 export const GET: APIRoute = async() => {
-  const enableMCP = import.meta.env.ENABLE_MCP === 'true'
+  // Check both import.meta.env and process.env for Vercel compatibility
+  const enableMCP = import.meta.env.ENABLE_MCP === 'true' || process.env.ENABLE_MCP === 'true'
   const isVercel = !!import.meta.env.VERCEL || process.env.VERCEL === '1'
-  const hasOpenAIKey = !!import.meta.env.OPENAI_API_KEY
+  const hasOpenAIKey = !!(import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)
   
   const debug = {
     environment: {
@@ -18,7 +19,11 @@ export const GET: APIRoute = async() => {
     configuration: {
       enableMCP,
       hasOpenAIKey,
-      openAIKeyLength: import.meta.env.OPENAI_API_KEY?.length || 0,
+      openAIKeyLength: (import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.length || 0,
+      envSource: {
+        ENABLE_MCP_import: import.meta.env.ENABLE_MCP,
+        ENABLE_MCP_process: process.env.ENABLE_MCP,
+      },
     },
     tools: {
       mode: isVercel ? 'Direct Functions' : 'MCP SDK',
