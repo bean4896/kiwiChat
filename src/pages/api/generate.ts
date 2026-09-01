@@ -8,6 +8,7 @@ import { initializeMCP } from '@/utils/mcpInit'
 import { fetchWebpage, formatSearchResults, searchWeb } from '@/utils/webSearchDirect'
 import type { APIRoute } from 'astro'
 import type { ChatMessage } from '@/types'
+import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 
 const apiKey = import.meta.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY
 const httpsProxy = import.meta.env.HTTPS_PROXY || process.env.HTTPS_PROXY
@@ -33,6 +34,124 @@ if (isVercel) {
 
 const FORWARD_HEADERS = ['origin', 'referer', 'cookie', 'user-agent', 'via']
 
+const DATETIME_TOOL: Tool = {
+  name: 'get_current_datetime',
+  description: 'Get the current date and time. Prefer the date already given in the system message for simple "what day is it" questions.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      timezone: {
+        type: 'string',
+        description: 'IANA timezone name. Defaults to Asia/Shanghai.',
+      },
+    },
+  },
+}
+
+const DIRECT_SEARCH_TOOLS: Tool[] = [
+  DATETIME_TOOL,
+  {
+    name: 'search_web',
+    description: 'Search the web using DuckDuckGo. Returns search results with titles, snippets, and URLs.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 10)',
+          default: 10,
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'fetch_webpage',
+    description: 'Fetch and extract the main content from a webpage. Returns the text content of the page. Do not use this to look up the current date.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The URL to fetch',
+        },
+        max_length: {
+          type: 'number',
+          description: 'Maximum content length in characters (default: 5000)',
+          default: 5000,
+        },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'summarize_url',
+    description: 'Fetch a URL and return a summary. Combines fetching and content extraction.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        url: {
+          type: 'string',
+          description: 'The URL to summarize',
+        },
+      },
+      required: ['url'],
+    },
+  },
+]
+
+function getBeijingDateTime(): { iso: string, display: string } {
+  const now = new Date()
+  const display = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(now)
+  return { iso: now.toISOString(), display }
+}
+
+function buildMcpSystemPrompt(userSystem?: string): string {
+  const { display } = getBeijingDateTime()
+  const prompt = `You are a helpful AI assistant with web search tools.
+
+Current date and time (Beijing, Asia/Shanghai): ${display}
+
+For questions about today's date, current time, or weekday: answer DIRECTLY using the date above. Do NOT fetch websites or search the web for the current date. You already know it.
+
+For movies/news/events and other real-time facts:
+- Use search_web first and answer from snippets when they contain enough information
+- Only use fetch_webpage if snippets are empty or too vague
+- Give specific names/titles. Be direct and concise. Do not tell the user to visit a website.
+
+If a tool fails, try a different tool or answer with what you already know. Never say you cannot get the current date.`
+
+  return userSystem ? `${prompt}\n\n${userSystem}` : prompt
+}
+
+function applyForwardHeaders(
+  request: Request,
+  headers: Record<string, string>,
+) {
+  if (baseUrl) {
+    request.headers.forEach((val, key) => {
+      if (FORWARD_HEADERS.includes(key) || key.startsWith('sec-') || key.startsWith('x-'))
+        headers[key] = val
+    })
+  }
+  if (ua)
+    headers['user-agent'] = ua
+}
+
 // Timeout wrapper for tool execution
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
   return Promise.race([
@@ -41,6 +160,51 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: strin
       setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)), timeoutMs),
     ),
   ])
+}
+
+async function executeNamedTool(name: string, args: Record<string, any>): Promise<string> {
+  if (name === 'get_current_datetime') {
+    const timezone = typeof args.timezone === 'string' && args.timezone ? args.timezone : 'Asia/Shanghai'
+    const now = new Date()
+    const display = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(now)
+    return `Current date and time (${timezone}): ${display}\nISO: ${now.toISOString()}`
+  }
+
+  if (isVercel) {
+    if (name === 'search_web') {
+      const results = await searchWeb(args.query, args.max_results || 10)
+      // eslint-disable-next-line no-console
+      console.log('[Vercel] Search completed, results:', results.length)
+      return `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
+    }
+    if (name === 'fetch_webpage') {
+      const content = await fetchWebpage(args.url, args.max_length || 5000)
+      // eslint-disable-next-line no-console
+      console.log('[Vercel] Fetch completed, length:', content.length)
+      return `Content from ${args.url}:\n\n${content}`
+    }
+    if (name === 'summarize_url') {
+      const content = await fetchWebpage(args.url, 3000)
+      // eslint-disable-next-line no-console
+      console.log('[Vercel] Summarize completed, length:', content.length)
+      return `Content from ${args.url} (for summarization):\n\n${content}`
+    }
+    throw new Error(`Unknown tool: ${name}`)
+  }
+
+  const mcpManager = getMCPManager()
+  const result = await mcpManager.executeTool(name, args)
+  return result.content?.[0]?.text || JSON.stringify(result)
 }
 
 // Initialize MCP on first request (only for local development)
@@ -83,201 +247,110 @@ export const POST: APIRoute = async({ request }) => {
   if (enableMCP && mcpInitPromise)
     await mcpInitPromise
 
-  // Add system message for MCP tools if enabled and no system message exists
   let requestMessageList = messages
-  if (enableMCP && (!messages[0] || messages[0].role !== 'system')) {
+  if (enableMCP) {
+    const existingSystem = messages[0]?.role === 'system' ? messages[0].content : ''
+    const rest = messages[0]?.role === 'system' ? messages.slice(1) : messages
     requestMessageList = [
-      {
-        role: 'system',
-        content: 'You are a helpful AI assistant with web search tools.\n\n🚨 CRITICAL WORKFLOW:\n\n1. For CURRENT DATE/TIME queries:\n   - Use fetch_webpage("https://www.timeanddate.com/")\n   - Extract and state the actual date directly\n\n2. For MOVIES/NEWS/EVENTS queries - BE SMART:\n\n   STRATEGY A - Try search snippets FIRST (FASTER!):\n   - Use search_web("latest movies 2025")\n   - READ the snippets carefully\n   - If snippets contain enough movie names/info → Answer directly from snippets\n   - ✅ Example: Snippet says "Wicked, Gladiator 2, Moana 2" → Use that!\n\n   STRATEGY B - Only fetch if snippets are empty/vague:\n   - If snippets don\'t have actual names → Use fetch_webpage\n   - Pick first good URL → Scrape → Extract names\n\n3. ⚡ SPEED MATTERS:\n   - Try to answer from search snippets when possible\n   - Only use fetch_webpage as backup\n   - Users prefer quick answers over perfect answers\n\n4. ❌ FORBIDDEN:\n   - Listing page titles as content\n   - Saying "visit [website]"\n   - Returning vague descriptions\n\n5. ✅ ALWAYS:\n   - Give specific names/titles from snippets or scraped content\n   - Format: "最新电影：《电影A》《电影B》《电影C》"\n   - Be direct and concise\n\nRemember: Snippets first → fetch only if needed!',
-      },
-      ...messages,
+      { role: 'system', content: buildMcpSystemPrompt(existingSystem) },
+      ...rest,
     ]
   }
 
   // Get tools if enabled
-  let tools
+  let tools: Tool[] | undefined
   if (enableMCP) {
     if (isVercel) {
-      // Define tools manually for Vercel (no MCP SDK)
-      tools = [
-        {
-          name: 'search_web',
-          description: 'Search the web using DuckDuckGo. Returns search results with titles, snippets, and URLs.',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              query: {
-                type: 'string',
-                description: 'The search query',
-              },
-              max_results: {
-                type: 'number',
-                description: 'Maximum number of results to return (default: 10)',
-                default: 10,
-              },
-            },
-            required: ['query'],
-          },
-        },
-        {
-          name: 'fetch_webpage',
-          description: 'Fetch and extract the main content from a webpage. Returns the text content of the page.',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              url: {
-                type: 'string',
-                description: 'The URL to fetch',
-              },
-              max_length: {
-                type: 'number',
-                description: 'Maximum content length in characters (default: 5000)',
-                default: 5000,
-              },
-            },
-            required: ['url'],
-          },
-        },
-        {
-          name: 'summarize_url',
-          description: 'Fetch a URL and return a summary. Combines fetching and content extraction.',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              url: {
-                type: 'string',
-                description: 'The URL to summarize',
-              },
-            },
-            required: ['url'],
-          },
-        },
-      ] as any
+      tools = DIRECT_SEARCH_TOOLS
       // eslint-disable-next-line no-console
       console.log(`[WebSearch] Using ${tools.length} direct tools for this request`)
       // eslint-disable-next-line no-console
-      console.log('[WebSearch] Tools:', tools.map((t: any) => t.name).join(', '))
+      console.log('[WebSearch] Tools:', tools.map(t => t.name).join(', '))
     } else {
       try {
         const mcpManager = getMCPManager()
         if (mcpManager.isConnected()) {
-          tools = mcpManager.getAllTools()
+          tools = [DATETIME_TOOL, ...mcpManager.getAllTools()]
           // eslint-disable-next-line no-console
           console.log(`[MCP] Using ${tools.length} tools for this request`)
           // eslint-disable-next-line no-console
           console.log('[MCP] Tools:', tools.map(t => t.name).join(', '))
         } else {
+          tools = [DATETIME_TOOL]
           // eslint-disable-next-line no-console
-          console.log('[MCP] Manager not connected, no tools available')
+          console.log('[MCP] Manager not connected, using built-in datetime tool only')
         }
       } catch (error) {
         console.error('[MCP] Error getting tools:', error)
+        tools = [DATETIME_TOOL]
       }
     }
   }
 
-  const initOptions = generatePayload(
-    request.headers.get('Authorization') ?? `Bearer ${apiKey}`,
-    requestMessageList,
-    tools,
-  )
+  const authorization = request.headers.get('Authorization') ?? `Bearer ${apiKey}`
 
-  const headers = initOptions.headers
-
-  if (baseUrl) request.headers.forEach((val, key) => (FORWARD_HEADERS.includes(key) || key.startsWith('sec-') || key.startsWith('x-')) && (headers[key] = val))
-
-  if (ua) headers['user-agent'] = ua
-
-  // #vercel-disable-blocks
-  if (httpsProxy) initOptions.dispatcher = new ProxyAgent(httpsProxy)
-  // #vercel-end
+  const buildOptions = (msgs: ChatMessage[], withTools: boolean, stream: boolean) => {
+    const options = generatePayload(authorization, msgs, withTools ? tools : undefined, stream)
+    applyForwardHeaders(request, options.headers)
+    // #vercel-disable-blocks
+    if (httpsProxy) options.dispatcher = new ProxyAgent(httpsProxy)
+    // #vercel-end
+    return options
+  }
 
   // When tools are available, use non-streaming to handle tool execution properly
   if (enableMCP && tools && tools.length > 0) {
     // eslint-disable-next-line no-console
     console.log('[MCP] Using non-streaming mode for tool execution')
 
-    // Make non-streaming request
-    const nonStreamOptions = generatePayload(
-      request.headers.get('Authorization') ?? `Bearer ${apiKey}`,
-      requestMessageList,
-      tools,
-      false, // non-streaming
-    )
+    let currentMessages: ChatMessage[] = requestMessageList
+    const maxRounds = 3
 
-    const nonStreamHeaders = nonStreamOptions.headers
-    if (baseUrl) request.headers.forEach((val, key) => (FORWARD_HEADERS.includes(key) || key.startsWith('sec-') || key.startsWith('x-')) && (nonStreamHeaders[key] = val))
-    if (ua) nonStreamHeaders['user-agent'] = ua
-    // #vercel-disable-blocks
-    if (httpsProxy) nonStreamOptions.dispatcher = new ProxyAgent(httpsProxy)
-    // #vercel-end
+    for (let round = 0; round < maxRounds; round++) {
+      const nonStreamOptions = buildOptions(currentMessages, true, false)
+      const response = await fetch(`${baseUrl}/v1/chat/completions`, nonStreamOptions)
 
-    let response = await fetch(`${baseUrl}/v1/chat/completions`, nonStreamOptions)
+      if (!response.ok)
+        return response as unknown as Response
 
-    if (!response.ok)
-      return response as unknown as Response
+      const data = await response.json() as any
+      const finishReason = data.choices?.[0]?.finish_reason
+      const toolCalls = data.choices?.[0]?.message?.tool_calls
+      // eslint-disable-next-line no-console
+      console.log('[MCP] Response finish_reason:', finishReason)
 
-    const data = await response.json() as any
-    // eslint-disable-next-line no-console
-    console.log('[MCP] Response finish_reason:', data.choices?.[0]?.finish_reason)
+      if (finishReason !== 'tool_calls' || !toolCalls?.length) {
+        const encoder = new TextEncoder()
+        const stream = new ReadableStream({
+          start(controller) {
+            const text = data.choices[0].message.content || ''
+            controller.enqueue(encoder.encode(text))
+            controller.close()
+          },
+        })
+        return new Response(stream, {
+          headers: { 'Content-Type': 'text/event-stream' },
+        })
+      }
 
-    // Check if tools were called
-    if (data.choices?.[0]?.finish_reason === 'tool_calls' && data.choices?.[0]?.message?.tool_calls) {
-      const toolCalls = data.choices[0].message.tool_calls
       // eslint-disable-next-line no-console
       console.log('[MCP] Tool calls detected:', toolCalls.map((tc: any) => tc.function.name).join(', '))
 
-      // Execute tools
       const toolResults: ChatMessage[] = []
-
       for (const toolCall of toolCalls) {
         const startTime = Date.now()
         try {
-          const args = JSON.parse(toolCall.function.arguments)
+          const rawArgs = toolCall.function.arguments
+          const args = rawArgs ? JSON.parse(rawArgs) : {}
           // eslint-disable-next-line no-console
           console.log(`[Tool] Executing ${toolCall.function.name}:`, args)
 
-          let resultText: string
-
-          // Use direct functions on Vercel, MCP on local
-          if (isVercel) {
-            // eslint-disable-next-line no-console
-            console.log('[Vercel] Using direct function for:', toolCall.function.name)
-
-            // Wrap each tool call with a timeout (15s max on Vercel)
-            const toolPromise = (async() => {
-              if (toolCall.function.name === 'search_web') {
-                const results = await searchWeb(args.query, args.max_results || 10)
-                // eslint-disable-next-line no-console
-                console.log('[Vercel] Search completed, results:', results.length)
-                return `Search results for "${args.query}":\n\n${formatSearchResults(results)}`
-              } else if (toolCall.function.name === 'fetch_webpage') {
-                const content = await fetchWebpage(args.url, args.max_length || 5000)
-                // eslint-disable-next-line no-console
-                console.log('[Vercel] Fetch completed, length:', content.length)
-                return `Content from ${args.url}:\n\n${content}`
-              } else if (toolCall.function.name === 'summarize_url') {
-                const content = await fetchWebpage(args.url, 3000)
-                // eslint-disable-next-line no-console
-                console.log('[Vercel] Summarize completed, length:', content.length)
-                return `Content from ${args.url} (for summarization):\n\n${content}`
-              } else {
-                throw new Error(`Unknown tool: ${toolCall.function.name}`)
-              }
-            })()
-
-            resultText = await withTimeout(toolPromise, 7000, toolCall.function.name)
-          } else {
-            // MCP for local development
-            const mcpManager = getMCPManager()
-            const result = await withTimeout(
-              mcpManager.executeTool(toolCall.function.name, args),
-              10000,
-              toolCall.function.name,
-            )
-            resultText = result.content?.[0]?.text || JSON.stringify(result)
-          }
+          const timeoutMs = isVercel ? 7000 : 10000
+          const resultText = await withTimeout(
+            executeNamedTool(toolCall.function.name, args),
+            timeoutMs,
+            toolCall.function.name,
+          )
 
           const duration = Date.now() - startTime
           // eslint-disable-next-line no-console
@@ -306,9 +379,8 @@ export const POST: APIRoute = async({ request }) => {
         }
       }
 
-      // Build messages with tool results
-      const updatedMessages: ChatMessage[] = [
-        ...requestMessageList,
+      currentMessages = [
+        ...currentMessages,
         {
           role: 'assistant',
           content: data.choices[0].message.content || '',
@@ -319,49 +391,18 @@ export const POST: APIRoute = async({ request }) => {
 
       // eslint-disable-next-line no-console
       console.log('[MCP] Sending', toolResults.length, 'tool results back to OpenAI')
-
-      // Make final streaming request with results
-      const finalOptions = generatePayload(
-        request.headers.get('Authorization') ?? `Bearer ${apiKey}`,
-        updatedMessages,
-        tools,
-        true, // streaming for final response
-      )
-
-      const finalHeaders = finalOptions.headers
-      if (baseUrl) request.headers.forEach((val, key) => (FORWARD_HEADERS.includes(key) || key.startsWith('sec-') || key.startsWith('x-')) && (finalHeaders[key] = val))
-      if (ua) finalHeaders['user-agent'] = ua
-      // #vercel-disable-blocks
-      if (httpsProxy) finalOptions.dispatcher = new ProxyAgent(httpsProxy)
-      // #vercel-end
-
-      response = await fetch(`${baseUrl}/v1/chat/completions`, finalOptions)
-      // eslint-disable-next-line no-console
-      console.log('[MCP] Final response status:', response.status, 'ok:', response.ok)
-      // eslint-disable-next-line no-console
-      console.log('[MCP] Returning streaming response...')
-      const streamResponse = parseOpenAIStream(response as unknown as Response)
-      // eslint-disable-next-line no-console
-      console.log('[MCP] Stream response created')
-      return streamResponse
     }
 
-    // No tool calls, convert to streaming response
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      start(controller) {
-        const text = data.choices[0].message.content || ''
-        controller.enqueue(encoder.encode(text))
-        controller.close()
-      },
-    })
-
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream' },
-    })
+    // Final answer without tools so the model cannot stall on another tool call
+    const finalOptions = buildOptions(currentMessages, false, true)
+    const finalResponse = await fetch(`${baseUrl}/v1/chat/completions`, finalOptions)
+    // eslint-disable-next-line no-console
+    console.log('[MCP] Final response status:', finalResponse.status, 'ok:', finalResponse.ok)
+    return parseOpenAIStream(finalResponse as unknown as Response)
   }
 
   // Normal streaming mode without tools
+  const initOptions = buildOptions(requestMessageList, false, true)
   const response = await fetch(`${baseUrl}/v1/chat/completions`, initOptions).catch((err: Error) => {
     console.error(err)
     return new Response(JSON.stringify({
