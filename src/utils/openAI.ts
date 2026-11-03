@@ -4,8 +4,8 @@ import type { ChatMessage } from '@/types'
 import type { RequestInit } from 'undici'
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 
-const model = import.meta.env.OPENAI_API_MODEL || 'gpt-3.5-turbo-16k'
-const temperature = parseFloat(import.meta.env.OPENAI_API_TEMPERATURE) || 1
+const model = import.meta.env.OPENAI_API_MODEL || process.env.OPENAI_API_MODEL || 'deepseek-flash'
+const temperature = parseFloat(import.meta.env.OPENAI_API_TEMPERATURE || process.env.OPENAI_API_TEMPERATURE || '') || 1
 
 /**
  * Convert MCP tools to OpenAI function format
@@ -40,6 +40,10 @@ export const generatePayload = (
     temperature,
     stream,
   }
+
+  // Flash defaults to thinking mode; disable it so chat/tool calls stay fast and stream as content.
+  if (String(model).toLowerCase().includes('deepseek'))
+    payload.thinking = { type: 'disabled' }
 
   // Add tools if provided
   if (tools && tools.length > 0) {
